@@ -207,3 +207,8 @@ body:has(> .studio-dialog-backdrop) .toast { z-index: 110; }
 .inspector-export > .btn { width:100%; margin-bottom:9px; }
 .preview-footer > .btn { flex:0 0 auto; }
 @media(max-width:550px){.region-note textarea,.image-version-picker select{font-size:16px;}.region-tools .btn,.preview-footer>.btn{font-size:11px;min-height:38px;}.device-preview.mobile .preview-surface{max-width:230px;}}
+
+/* Keep submitted image actions legible while preventing duplicate submissions. */
+.btn[aria-busy="true"] { opacity:.85; cursor:progress; }
+.btn[aria-busy="true"] > svg { flex-shrink:0; }
+.btn[aria-busy="true"] > span { min-width:0; }
