@@ -26,3 +26,13 @@ export function download(blob:Blob,name:string){const url=URL.createObjectURL(bl
 const crcTable=Array.from({length:256},(_,n)=>{for(let k=0;k<8;k++)n=n&1?0xEDB88320^(n>>>1):n>>>1;return n>>>0;});
 export function crc32(a:Uint8Array){let c=0xFFFFFFFF;for(const v of a)c=crcTable[(c^v)&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
 export async function zipFiles(files:{name:string;blob:Blob}[]){const chunks:Uint8Array[]=[],central:Uint8Array[]=[];let offset=0;const enc=new TextEncoder();for(const file of files){const bytes=new Uint8Array(await file.blob.arrayBuffer()),name=enc.encode(file.name),crc=crc32(bytes);const local=new Uint8Array(30+name.length),v=new DataView(local.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint16(6,0x800,true);v.setUint32(14,crc,true);v.setUint32(18,bytes.length,true);v.setUint32(22,bytes.length,true);v.setUint16(26,name.length,true);local.set(name,30);const c=new Uint8Array(46+name.length),cv=new DataView(c.buffer);cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);cv.setUint16(8,0x800,true);cv.setUint32(16,crc,true);cv.setUint32(20,bytes.length,true);cv.setUint32(24,bytes.length,true);cv.setUint16(28,name.length,true);cv.setUint32(42,offset,true);c.set(name,46);central.push(c);chunks.push(local,bytes);offset+=local.length+bytes.length;}const size=central.reduce((s,a)=>s+a.length,0),end=new Uint8Array(22),ev=new DataView(end.buffer);ev.setUint32(0,0x06054b50,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);ev.setUint32(12,size,true);ev.setUint32(16,offset,true);return new Blob([...chunks,...central,end] as BlobPart[],{type:'application/zip'});}
+
+export async function createRegionMask(task:Task,variant:Variant,regions:import('./atmos-types').RegionNote[]){
+ const {regionToSource}=await import('./atmos-versions');
+ const original=await image(variant.url),mask=document.createElement('canvas');mask.width=original.naturalWidth;mask.height=original.naturalHeight;
+ if(mask.width*mask.height>20000000)throw new Error('原图超过 2000 万像素，请使用较小的背景图进行框选调整');
+ const ctx=mask.getContext('2d')!;ctx.fillStyle='#fff';ctx.fillRect(0,0,mask.width,mask.height);
+ const sourceRegions=regions.map(region=>{const r=regionToSource(region,task[variant.device],[mask.width,mask.height],[variant.focusX,variant.focusY]);if(!r.width||!r.height)throw new Error('框选没有覆盖背景，请重新框选');ctx.clearRect(r.x,r.y,r.width,r.height);return {...region,x:r.x/mask.width,y:r.y/mask.height,width:r.width/mask.width,height:r.height/mask.height};});
+ const blob=await canvasBlob(mask,'png');if(blob.size>=4*1024*1024)throw new Error('区域蒙版超过 4 MB，请缩小原图');
+ return {dataUrl:mask.toDataURL('image/png'),regions:sourceRegions};
+}

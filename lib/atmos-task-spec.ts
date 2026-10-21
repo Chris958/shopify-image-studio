@@ -10,7 +10,7 @@ export function bindTaskSpec(task:Task,doc:Doc):Task{
 }
 
 export function hasTaskOutputs(task:Task){
- return !!(task.variants?.length||task.exports?.length||(task as any).history?.length);
+ return !!(task.variants?.length||task.exports?.length||task.imageVersions?.length||task.history?.length);
 }
 
 /** Repair the pre-publication task without resetting its inputs or a pinned version. */
@@ -21,5 +21,5 @@ export function syncPendingTaskSpec(task:Task,published?:Doc):Task{
 
 /** A deliberate version change starts a fresh task; the original keeps its outputs. */
 export function copyTaskForSpec(task:Task,published:Doc):Task{
- return {...bindTaskSpec(structuredClone(task),published),variants:[],exports:[],status:'草稿',selected:0,history:[],layoutPlans:[]} as Task;
+ return {...bindTaskSpec(structuredClone(task),published),variants:[],exports:[],status:'草稿',selected:0,imageVersions:[],history:[],layoutPlans:[]} as Task;
 }
