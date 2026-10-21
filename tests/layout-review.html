@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shopify Image Studio · layout review</title>
+<style>
+body{margin:0;background:#dce3dc;color:#193a2c;font:14px system-ui}header{padding:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}label{display:flex;gap:8px;align-items:center}select,button{font:inherit;padding:6px;border:1px solid #acbcad;border-radius:4px;background:white}iframe{display:block;border:0;background:white;max-width:100%}pre{position:fixed;right:12px;top:65px;background:#ffffffed;padding:16px;border-radius:8px;max-width:290px;max-height:65vh;overflow:auto;white-space:pre-wrap;pointer-events:none;font-size:11px}
+</style>
+<header><b>布局检查</b><label>测试宽度 <select id="width"><option>320</option><option selected>390</option><option>550</option><option>600</option><option>768</option><option>900</option><option>1100</option><option>1280</option></select></label><label>测试高度 <select id="height"><option>480</option><option>640</option><option selected>830</option></select></label><button id="check">检查当前布局</button></header>
+<iframe title="Studio layout review" src="/" width="390" height="830"></iframe><pre id="report">选择尺寸，操作工作台后检查。
+弹窗应限制在可视区、可滚动，Tab 不离开弹窗，Escape 关闭并恢复焦点。</pre>
+<script>
+const frame=document.querySelector('iframe');
+for(const dimension of ['width','height']) document.getElementById(dimension).onchange=e=>frame.style[dimension]=e.target.value+'px';
+document.getElementById('check').onclick=()=>{
+ const d=frame.contentDocument,w=d.documentElement.clientWidth,h=frame.contentWindow.innerHeight,dialog=d.querySelector('[role=dialog]');
+ const issues=[];
+ if(d.documentElement.scrollWidth>w+1)issues.push('页面横向溢出 '+(d.documentElement.scrollWidth-w)+'px');
+ const scope=dialog||d.querySelector('main');
+ for(const e of scope.querySelectorAll('.panel,.field,input,textarea,select,.btn,.brand-name-display,.routing-row,.device-preview,.page-heading,.tag')){
+  const r=e.getBoundingClientRect();if(!r.width||!r.height)continue;
+  const parent=e.closest('.tabs');if(parent)continue;
+  if(r.right>w+1||r.left<0)issues.push((e.className||e.tagName)+' 超出视口');
+ }
+ if(dialog){const r=dialog.getBoundingClientRect();if(r.top<0||r.bottom>h+1)issues.push('弹窗超出可视高度');if(d.body.style.overflow!=='hidden')issues.push('背景未锁定');if(!d.querySelector('.app-shell').inert)issues.push('背景仍可交互');}
+ document.getElementById('report').textContent=JSON.stringify({viewport:[w,h],page:d.querySelector('h1')?.innerText,dialog:dialog?.querySelector('h2')?.innerText||null,status:issues.length?'FAIL':'PASS',issues:[...new Set(issues)]},null,2);
+};
+</script>
+</html>
