@@ -11,7 +11,7 @@ export async function POST(req:Request){try{
  if(action==='test'&&profile.endpoint==='images'){
   const res=await apiFetch(profile.baseUrl,'/models',apiKey);const data=await checkedJson(res);const found=data.data?.some((x:any)=>x.id===profile.model);result={reachable:true,modelListed:!!found,verified:false,message:'连接可达；实际生成与编辑能力需通过真实试图验证。'};
  }else if(action==='image'){
-  const task=body.task;if(!task?.spec)throw new Error('缺少品牌规范快照');if(body.stage==='high'){const saved=await readDoc(body.taskId,u);if(!saved||saved.kind!=='task'||!saved.data.variants?.some((v:any)=>v.id===body.approvedVariantId&&v.approved))throw new Error('请先保存并确认对应设备的预览');}
+  const task=body.task;if(!task?.spec)throw new Error('缺少品牌规范快照');const published=await readDoc(task.specId,u);if(!published||published.kind!=='spec'||published.project!==project||published.data.status!=='published')throw new Error('任务引用的品牌规范未发布或不属于当前项目，请重新选择已发布版本');task.spec=published.data;if(body.stage==='high'){const saved=await readDoc(body.taskId,u);if(!saved||saved.kind!=='task'||saved.project!==project||saved.data.specId!==task.specId||!saved.data.variants?.some((v:any)=>v.id===body.approvedVariantId&&v.approved))throw new Error('请先保存并确认对应设备的预览');}
   const refs=await materials(body.assets||[],u);let image:any;
   if(body.variantUrl?.startsWith('/api/files/')){const a=await materials([body.variantUrl.split('/').pop()],u);refs.unshift(...a);}
   let nativeSize=profile.size;if(!nativeSize||nativeSize==='adaptive'){

@@ -162,3 +162,16 @@ body:has(> .studio-dialog-backdrop) .toast { z-index: 110; }
   .app-footer > span:first-child { width: 100%; font-size: 8px; }
   .toast { font-size: 12px; }
 }
+
+.task-spec-panel { display:flex; flex-wrap:wrap; align-items:center; gap:14px 24px; }
+.task-spec-panel > .field { flex:0 1 300px; margin:0; min-width:0; }
+.task-spec-panel > p { flex:1 1 220px; margin:0; font-size:11px; line-height:1.8; color:#7b8d78; }
+@media(max-width:550px){ .task-spec-panel > .field {flex-basis:100%;} .task-spec-panel > p {font-size:12px;} }
+.studio-intro { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:28px; border:1px solid #e0e8dd; border-radius:10px; background:#edf2e9; margin-bottom:28px; }
+.studio-intro h2 { margin:12px 0 10px; font-size:24px; color:#2c5138; line-height:1.5; }
+.studio-intro p { font-size:12px; color:#7c8b74; line-height:1.9; }
+.studio-intro > div { min-width:0; }
+.studio-intro > .btn { flex-shrink:0; }
+.composition-guide { display:flex; align-items:center; gap:12px; border:1px dashed #c6d5c3; background:#f2f6ef; padding:22px 15px; margin-bottom:20px; border-radius:6px; color:#7b9171; line-height:1.8; font-size:11px; }
+.project-create-actions { grid-template-columns:minmax(0,1fr); }
+@media(max-width:550px){ .studio-intro { flex-direction:column; align-items:stretch; padding:23px; } .studio-intro h2 {font-size:22px;} }
