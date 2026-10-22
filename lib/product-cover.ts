@@ -2,7 +2,7 @@ import {uid,type Variant} from './atmos-types';
 export const COVER_SIZE=1500;
 export type CoverStyle={name:string;light:'left'|'right'|'top';shadow:'defined'|'soft';fill:number;notes:string};
 export type CoverVersion=Variant&{stage:'preview'|'high';coverStyle:CoverStyle};
-export type CoverTask={name:string;description:string;sourceIds:string[];style:CoverStyle;adjustment:string;versions:CoverVersion[];selectedId:string;status:string;exports:{versionId:string;format:string;size:number;created:string}[]};
+export type CoverTask={name:string;description:string;sourceIds:string[];style:CoverStyle;adjustment:string;versions:CoverVersion[];selectedId:string;status:string;exports:{versionId:string;format:string;size:number;created:string;optimized?:boolean;quality?:number;bytes?:number;originalBytes?:number}[]};
 export const defaultCoverStyle:CoverStyle={name:'标准棚拍 · 清晰投影',light:'left',shadow:'defined',fill:80,notes:''};
 export function coverStyle(value:unknown):CoverStyle{
  const s=value as CoverStyle;if(!s||!['left','right','top'].includes(s.light)||!['defined','soft'].includes(s.shadow)||!Number.isFinite(s.fill)||s.fill<60||s.fill>90||typeof s.name!=='string'||s.name.length>80||typeof s.notes!=='string'||s.notes.length>1000)throw new Error('请检查棚拍规范，主体占比应为 60%–90%');
