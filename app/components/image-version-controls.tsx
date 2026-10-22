@@ -3,14 +3,14 @@ import {useEffect,useRef,useState,type ReactNode,type PointerEvent} from 'react'
 import {ScanLine,Trash2} from 'lucide-react';
 import type {RegionNote,Variant} from '../../lib/atmos-types';
 
-export function ImageVersionPicker({versions,current,disabled,onSelect}:{versions:Variant[];current:Variant;disabled:boolean;onSelect:(id:string)=>void}){
- const label=current.device==='desktop'?'电脑端':'手机端';
+export function ImageVersionPicker({versions,current,disabled,onSelect,deviceLabel}:{versions:Variant[];current:Variant;disabled:boolean;onSelect:(id:string)=>void;deviceLabel?:string}){
+ const label=deviceLabel||(current.device==='desktop'?'电脑端':'手机端');
  return <div className="image-version-picker"><label>{label}历史版本<select aria-label={label+'历史版本'} value={current.id} disabled={disabled} onChange={e=>onSelect(e.target.value)}>{versions.map(v=><option key={v.id} value={v.id}>v{v.revision} · {v.label}{v.approved?' · 已确认':''}</option>)}</select></label><div className="version-filmstrip" aria-label={label+'版本缩略图'}>{versions.map(v=><button type="button" disabled={disabled} aria-pressed={v.id===current.id} aria-label={label+'选择版本 v'+v.revision} title={v.editRequest?.instruction||v.label} key={v.id} onClick={()=>onSelect(v.id)}><img src={v.url} alt=""/><span>v{v.revision}{v.id===current.id?' · 当前':''}</span></button>)}</div></div>;
 }
 
-export function RegionCanvas({variant,children,disabled,onRegions}:{variant:Variant;children:ReactNode;disabled:boolean;onRegions:(regions:RegionNote[])=>void}){
+export function RegionCanvas({variant,children,disabled,onRegions,deviceLabel}:{variant:Variant;children:ReactNode;disabled:boolean;onRegions:(regions:RegionNote[])=>void;deviceLabel?:string}){
  const [drawing,setDrawing]=useState(false),[draft,setDraft]=useState<RegionNote|null>(null),start=useRef<{x:number;y:number}|null>(null);
- const label=variant.device==='desktop'?'电脑端':'手机端',regions=variant.regions||[];
+ const label=deviceLabel||(variant.device==='desktop'?'电脑端':'手机端'),regions=variant.regions||[];
  useEffect(()=>{setDrawing(false);setDraft(null);start.current=null;},[variant.id]);
  function point(event:PointerEvent<HTMLDivElement>){const r=event.currentTarget.getBoundingClientRect();return {x:Math.max(0,Math.min(1,(event.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(event.clientY-r.top)/r.height))};}
  function rectangle(end:{x:number;y:number}){const p=start.current!;return {id:'region-'+Date.now(),x:Math.min(p.x,end.x),y:Math.min(p.y,end.y),width:Math.abs(p.x-end.x),height:Math.abs(p.y-end.y),note:''};}

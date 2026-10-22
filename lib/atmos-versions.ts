@@ -40,8 +40,8 @@ export function validateRegions(value:unknown):RegionNote[]{
  if(value===undefined)return [];if(!Array.isArray(value)||value.length>8)throw new Error('每张图片最多添加 8 个框选区域');
  return value.map((r:any)=>{if(!r||!['x','y','width','height'].every(k=>Number.isFinite(r[k]))||r.x<0||r.y<0||r.width<=0||r.height<=0||r.x+r.width>1.001||r.y+r.height>1.001||typeof r.note!=='string'||!r.note.trim()||r.note.length>1000)throw new Error('请检查框选范围，并为每个区域填写调整备注');return {id:String(r.id||''),x:r.x,y:r.y,width:r.width,height:r.height,note:r.note.trim()};});
 }
-export function regionToSource(r:Pick<RegionNote,'x'|'y'|'width'|'height'>,target:[number,number],source:[number,number],focus:[number,number]){
- const [tw,th]=target,[sw,sh]=source,scale=Math.max(tw/sw,th/sh),ox=(tw-sw*scale)*focus[0]/100,oy=(th-sh*scale)*focus[1]/100;
+export function regionToSource(r:Pick<RegionNote,'x'|'y'|'width'|'height'>,target:[number,number],source:[number,number],focus:[number,number],fit:'cover'|'contain'='cover'){
+ const [tw,th]=target,[sw,sh]=source,scale=(fit==='contain'?Math.min:Math.max)(tw/sw,th/sh),ox=(tw-sw*scale)*focus[0]/100,oy=(th-sh*scale)*focus[1]/100;
  const x=Math.max(0,(r.x*tw-ox)/scale),y=Math.max(0,(r.y*th-oy)/scale),right=Math.min(sw,((r.x+r.width)*tw-ox)/scale),bottom=Math.min(sh,((r.y+r.height)*th-oy)/scale);
  return {x:Math.floor(x),y:Math.floor(y),width:Math.max(0,Math.ceil(right)-Math.floor(x)),height:Math.max(0,Math.ceil(bottom)-Math.floor(y))};
 }
