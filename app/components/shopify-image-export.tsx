@@ -3,7 +3,7 @@ import {useEffect,useRef,useState,type UIEvent} from 'react';
 import {Download,SlidersHorizontal,Check} from 'lucide-react';
 import {StudioButton as Btn} from './studio-button';
 import type {CoverVersion} from '../../lib/product-cover';
-import {COVER_SIZE,coverFilename} from '../../lib/product-cover';
+import {COVER_SIZE,coverFilename,coverVersionBackground} from '../../lib/product-cover';
 import {drawProductCover,canvasBlob} from '../../lib/atmos-render';
 import {encodeShopifyImage,readableBytes,byteReduction,type ShopifyFormat,type ShopifyExportMeta} from '../../lib/shopify-image-export';
 
@@ -18,7 +18,7 @@ export function ShopifyImageExport({variant,name,disabled,onRun,onRecord}:Props)
  function settings(nextFormat:ShopifyFormat,nextQuality:number){setFormat(nextFormat);setQuality(nextQuality);setReady(false);setError('');}
  async function prepare(){await onRun('正在生成 Shopify 压缩预览',async()=>{setPreparing(true);setReady(false);setError('');try{
   if(!enabled||!variant)throw new Error('请先生成并确认高清版本');
-  let original=cache.current;if(!original){const canvas=document.createElement('canvas');await drawProductCover(canvas,variant.url,COVER_SIZE);const blob=await canvasBlob(canvas,'png');if(!alive.current)return;original={canvas,blob,url:URL.createObjectURL(blob)};cache.current=original;}
+  let original=cache.current;if(!original){const canvas=document.createElement('canvas');await drawProductCover(canvas,variant.url,COVER_SIZE,coverVersionBackground(variant));const blob=await canvasBlob(canvas,'png');if(!alive.current)return;original={canvas,blob,url:URL.createObjectURL(blob)};cache.current=original;}
   // Always encode from the original rendered canvas, never from an already compressed preview.
   const blob=await encodeShopifyImage(original.canvas,format,quality);if(!alive.current)return;
   setPreview({url:URL.createObjectURL(blob),originalUrl:original.url,originalBytes:original.blob.size,bytes:blob.size,format,quality});

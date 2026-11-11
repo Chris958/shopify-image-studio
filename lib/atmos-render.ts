@@ -1,3 +1,4 @@
+import {COVER_BACKGROUND} from './product-cover';
 import type {Task,Variant,TextLayer,Device,Doc} from './atmos-types';
 export function layoutLayers(task:Task,device:Device,style=0):TextLayer[]{
  const [w,h]=task[device],phone=device==='mobile'&&h/w>.85;
@@ -37,10 +38,10 @@ export async function createRegionMask(task:Task,variant:Variant,regions:import(
  return {dataUrl:mask.toDataURL('image/png'),regions:sourceRegions};
 }
 
-/** Opaque white, exact square output; contain avoids clipping an unexpected source ratio. */
-export async function drawProductCover(canvas:HTMLCanvasElement,url:string,size=1500){
+/** Opaque studio background, exact square output; contain avoids clipping an unexpected source ratio. */
+export async function drawProductCover(canvas:HTMLCanvasElement,url:string,size=1500,background=COVER_BACKGROUND){
  const im=await image(url);canvas.width=size;canvas.height=size;
- const ctx=canvas.getContext('2d')!;ctx.fillStyle='#ffffff';ctx.fillRect(0,0,size,size);
+ const ctx=canvas.getContext('2d')!;ctx.fillStyle=background;ctx.fillRect(0,0,size,size);
  const k=Math.min(size/im.naturalWidth,size/im.naturalHeight);
  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
  ctx.drawImage(im,(size-im.naturalWidth*k)/2,(size-im.naturalHeight*k)/2,im.naturalWidth*k,im.naturalHeight*k);
