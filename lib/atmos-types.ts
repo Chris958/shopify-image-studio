@@ -2,7 +2,7 @@ import type {ArtDirection,DesignReview} from './art-direction';
 export type Doc = {id:string;kind:string;project:string;data:any;revision?:number;updated?:string};
 export type Role = 'analysis'|'spec'|'planning'|'image'|'review';
 export const roleNames:Record<Role,string>={analysis:'品牌视觉分析',spec:'规范整理',planning:'文案与构图规划',image:'图片生成与编辑',review:'图片评审'};
-export type Profile={id:string;name:string;baseUrl:string;model:string;endpoint:'responses'|'chat'|'images';roles:Role[];status:'unverified'|'reachable'|'verified';quality:string;size:string;imageInput:boolean;structured:boolean;};
+export type Profile={id:string;name:string;baseUrl:string;model:string;endpoint:'responses'|'chat'|'images';roles:Role[];status:'unverified'|'reachable'|'verified';quality:string;size:string;imageInput:boolean;structured:boolean;customImageSize?:boolean;};
 export type Spec={version:number;status:'draft'|'published';tone:string;colors:string[];background:string;titleColor:string;titleFont:string;bodyFont:string;titleWeight:string;bodyWeight:string;visual:string;composition:string;forbidden:string;source:string;references:string[];rules:{text:string;source:string;locked:boolean}[];};
 export type Device='desktop'|'mobile';
 export type TextLayer={id:string;role:'title'|'subtitle'|'description'|'cta';text:string;x:number;y:number;width:number;fontSize:number;lineHeight:number;letterSpacing:number;align:'left'|'center'|'right';color:string;font:string;weight:string;visible:boolean;maxLines:number;};
