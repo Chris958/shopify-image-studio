@@ -6,7 +6,7 @@ export function hasPublishedTaskSpec(task:Task){
 
 export function bindTaskSpec(task:Task,doc:Doc):Task{
  if(doc.kind!=='spec'||doc.data.status!=='published')throw new Error('只能引用已发布的品牌规范');
- return {...task,spec:structuredClone(doc.data),specId:doc.id};
+ return {...task,spec:structuredClone(doc.data),specId:doc.id,artDirection:undefined};
 }
 
 export function hasTaskOutputs(task:Task){

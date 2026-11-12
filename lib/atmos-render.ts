@@ -1,9 +1,12 @@
+import {productFrame,productRegionToSource} from './product-framing';
+import type {SafeArea} from './art-direction';
 import {COVER_BACKGROUND} from './product-cover';
 import type {Task,Variant,TextLayer,Device,Doc} from './atmos-types';
 export function layoutLayers(task:Task,device:Device,style=0):TextLayer[]{
  const [w,h]=task[device],phone=device==='mobile'&&h/w>.85;
- const x=style===1?.08:.07,width=style===1?.84:phone?.84:.47;
- let y=phone?.08:h<400?.12:.16;
+ const area=task.artDirection?.[device]?.textArea;
+ const x=style===1?.08:area?.x??.07,width=style===1?.84:area?.width??(phone?.84:.47);
+ let y=style===0&&area?area.y:phone?.08:h<400?.12:.16;
  const ctx=typeof document!=='undefined'?document.createElement('canvas').getContext('2d'):null;
  return (['title','subtitle','description','cta'] as const).filter(r=>task[r]).map(role=>{
   const fs=Math.max(device==='mobile'?14:16,role==='title'?(phone?w*.092:Math.min(h*.18,w*.053)):role==='subtitle'?(phone?w*.041:h*.068):(phone?w*.032:h*.048));
@@ -14,13 +17,25 @@ export function layoutLayers(task:Task,device:Device,style=0):TextLayer[]{
  });
 }
 export function wrapText(ctx:CanvasRenderingContext2D,text:string,max:number){const output:string[]=[];for(const paragraph of text.split('\n')){let line='';const raw=paragraph.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*\s*|[^A-Za-z0-9]/gu)||[''];const words=raw.flatMap(word=>ctx.measureText(word).width>max?Array.from(word):[word]);for(const word of words){if(ctx.measureText(line+word).width<=max||!line){line+=word;}else{output.push(line.trimEnd());line=word.trimStart();}}output.push(line.trimEnd());}return output;}
+/** Enforce exact copy and brand fonts; fit type within the available canvas without changing words. */
+export function fitBrandLayers(task:Task,v:Pick<Variant,'device'>,layers:TextLayer[]):TextLayer[]{
+ const [w,h]=task[v.device],ctx=typeof document!=='undefined'?document.createElement('canvas').getContext('2d'):null;
+ return layers.map(l=>{const title=l.role==='title',next={...l,text:task[l.role],font:title?task.spec.titleFont:task.spec.bodyFont,weight:title?task.spec.titleWeight:task.spec.bodyWeight};
+  next.width=Math.max(.1,Math.min(.94,Number.isFinite(next.width)?next.width:.5));next.x=Math.max(.02,Math.min(.98-next.width,Number.isFinite(next.x)?next.x:.07));next.y=Math.max(.02,Math.min(.94,Number.isFinite(next.y)?next.y:.1));
+  if(!ctx)return next;const minimum=v.device==='mobile'?14:16;next.fontSize=Math.max(minimum,Number.isFinite(next.fontSize)?next.fontSize:minimum);next.lineHeight=Math.max(1,Math.min(2,next.lineHeight||1.3));
+  for(let i=0;i<120;i++){ctx.font=`${next.weight} ${next.fontSize}px ${family(next.font)}`;const lines=wrapText(ctx,next.text,w*next.width),available=Math.min((.96-next.y)*h,...layers.filter(a=>a.id!==l.id&&a.y>next.y&&a.x<next.x+next.width&&a.x+a.width>next.x).map(a=>(a.y-next.y)*h-8));if(lines.length<=Math.max(1,next.maxLines)&&lines.length*next.fontSize*next.lineHeight<=available)break;if(next.fontSize<=minimum)break;next.fontSize=Math.max(minimum,next.fontSize-1);}
+  return next;
+ });
+}
 async function image(url:string){const im=new Image();im.crossOrigin='anonymous';im.src=url;await im.decode();return im;}
 export async function loadFonts(assets:Doc[]){for(const a of assets.filter(a=>['woff','woff2','ttf','otf'].includes(a.data.ext))){const family='font_'+a.id.replaceAll('-','');if(!Array.from(document.fonts).some(f=>f.family===family)){const font=new FontFace(family,`url("${a.data.url}")`,{weight:'100 900'});await font.load();document.fonts.add(font);}}}
 export function family(id:string){return id==='system'?'Arial, "Microsoft YaHei", sans-serif':'"font_'+id.replaceAll('-','')+'"';}
 export async function drawVariant(canvas:HTMLCanvasElement,task:Task,v:Variant,options:{scale?:number;text?:boolean;safe?:boolean;assets?:Doc[]}={}){const [w,h]=task[v.device];if(!Number.isFinite(w)||!Number.isFinite(h)||w<1||h<1||w*h*(options.scale||1)**2>20000000)throw new Error('导出尺寸无效或超过 2000 万像素，请降低尺寸或倍率');canvas.width=Math.round(w*(options.scale||1));canvas.height=Math.round(h*(options.scale||1));const ctx=canvas.getContext('2d')!;ctx.scale(options.scale||1,options.scale||1);ctx.fillStyle=task.spec.background;ctx.fillRect(0,0,w,h);const errors:string[]=[];await loadFonts((options.assets||[]).filter(a=>v.layers.some(l=>l.font===a.id)));const im=await image(v.url);const factor=Math.max(w/im.width,h/im.height);const dw=im.width*factor,dh=im.height*factor;ctx.drawImage(im,(w-dw)*v.focusX/100,(h-dh)*v.focusY/100,dw,dh);if(v.overlay>0){const g=ctx.createLinearGradient(0,0,w,0);g.addColorStop(0,`rgba(0,0,0,${v.overlay})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.fillRect(0,0,w,h);}
  for(const insert of [v.subject,v.logo])if(insert){const picture=await image(insert.url);const iw=insert.width*w;ctx.drawImage(picture,insert.x*w,insert.y*h,iw,iw*picture.height/picture.width);}
- if(options.text??task.withText)for(const l of v.layers.filter(l=>l.visible&&l.text)){if(l.font!=='system'&&!(options.assets||[]).some(a=>a.id===l.font))errors.push(l.role+'：指定字体文件缺失');ctx.font=`${l.weight} ${l.fontSize}px ${family(l.font)}`;ctx.fillStyle=l.color;ctx.textBaseline='top';ctx.textAlign=l.align;if('letterSpacing' in ctx)(ctx as any).letterSpacing=l.letterSpacing+'px';const lines=wrapText(ctx,l.text,w*l.width);const maxLines=Math.max(1,l.maxLines||5);if(lines.length>maxLines)errors.push(l.role+'：超过设定行数');if(l.y*h+lines.length*l.fontSize*l.lineHeight>h*.96)errors.push(l.role+'：超出画布底部');if(l.x<0||l.x+l.width>1.001||l.y<0)errors.push(l.role+'：文字超出画布');if(l.fontSize<(v.device==='mobile'?12:16))errors.push(l.role+'：字号低于最小值');const tx=l.x*w+(l.align==='center'?l.width*w/2:l.align==='right'?l.width*w:0);lines.forEach((s,i)=>ctx.fillText(s,tx,l.y*h+i*l.fontSize*l.lineHeight));}
- if(options.safe){ctx.strokeStyle='rgba(255,255,255,.6)';ctx.setLineDash([8,6]);ctx.lineWidth=Math.max(1,w/900);ctx.strokeRect(w*.05,h*.05,w*.9,h*.9);}
+ const textRects:{role:string;x:number;y:number;w:number;h:number}[]=[];
+ if(options.text??task.withText){for(const role of ['title','subtitle','description','cta'] as const)if(task[role]&&!v.layers.some(l=>l.role===role&&l.visible&&l.text===task[role]))errors.push(role+'：文案缺失或与已确认内容不一致');}
+ if(options.text??task.withText)for(const l of v.layers.filter(l=>l.visible&&l.text)){if(l.font!=='system'&&!(options.assets||[]).some(a=>a.id===l.font))errors.push(l.role+'：指定字体文件缺失');if(l.font!==(l.role==='title'?task.spec.titleFont:task.spec.bodyFont))errors.push(l.role+'：字体不符合引用的品牌规范');ctx.font=`${l.weight} ${l.fontSize}px ${family(l.font)}`;ctx.fillStyle=l.color;ctx.textBaseline='top';ctx.textAlign=l.align;if('letterSpacing' in ctx)(ctx as any).letterSpacing=l.letterSpacing+'px';const lines=wrapText(ctx,l.text,w*l.width);const maxLines=Math.max(1,l.maxLines||5);if(lines.length>maxLines)errors.push(l.role+'：超过设定行数');if(l.y*h+lines.length*l.fontSize*l.lineHeight>h*.96)errors.push(l.role+'：超出画布底部');if(l.x<0||l.x+l.width>1.001||l.y<0)errors.push(l.role+'：文字超出画布');if(l.fontSize<(v.device==='mobile'?12:16))errors.push(l.role+'：字号低于最小值');const rect={role:l.role,x:l.x*w,y:l.y*h,w:l.width*w,h:lines.length*l.fontSize*l.lineHeight};for(const a of textRects)if(rect.x<a.x+a.w&&rect.x+rect.w>a.x&&rect.y<a.y+a.h&&rect.y+rect.h>a.y)errors.push(l.role+'：与 '+a.role+' 文字区域重叠');textRects.push(rect);const tx=l.x*w+(l.align==='center'?l.width*w/2:l.align==='right'?l.width*w:0);lines.forEach((s,i)=>ctx.fillText(s,tx,l.y*h+i*l.fontSize*l.lineHeight));}
+ if(options.safe){ctx.strokeStyle='rgba(255,255,255,.6)';ctx.setLineDash([8,6]);ctx.lineWidth=Math.max(1,w/900);ctx.strokeRect(w*.05,h*.05,w*.9,h*.9);const area=v.artDirection?.[v.device]?.textArea;if(area){ctx.strokeStyle='#60b79a';ctx.strokeRect(area.x*w,area.y*h,area.width*w,area.height*h);}}
  return {errors,sourceWidth:im.width,sourceHeight:im.height,scaleUp:factor};}
 export async function canvasBlob(canvas:HTMLCanvasElement,format:string='png',quality=.95){return new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('无法导出该格式')),format==='jpg'?'image/jpeg':'image/'+format,quality));}
 export function download(blob:Blob,name:string){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
@@ -28,22 +43,22 @@ const crcTable=Array.from({length:256},(_,n)=>{for(let k=0;k<8;k++)n=n&1?0xEDB88
 export function crc32(a:Uint8Array){let c=0xFFFFFFFF;for(const v of a)c=crcTable[(c^v)&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
 export async function zipFiles(files:{name:string;blob:Blob}[]){const chunks:Uint8Array[]=[],central:Uint8Array[]=[];let offset=0;const enc=new TextEncoder();for(const file of files){const bytes=new Uint8Array(await file.blob.arrayBuffer()),name=enc.encode(file.name),crc=crc32(bytes);const local=new Uint8Array(30+name.length),v=new DataView(local.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint16(6,0x800,true);v.setUint32(14,crc,true);v.setUint32(18,bytes.length,true);v.setUint32(22,bytes.length,true);v.setUint16(26,name.length,true);local.set(name,30);const c=new Uint8Array(46+name.length),cv=new DataView(c.buffer);cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);cv.setUint16(8,0x800,true);cv.setUint32(16,crc,true);cv.setUint32(20,bytes.length,true);cv.setUint32(24,bytes.length,true);cv.setUint16(28,name.length,true);cv.setUint32(42,offset,true);c.set(name,46);central.push(c);chunks.push(local,bytes);offset+=local.length+bytes.length;}const size=central.reduce((s,a)=>s+a.length,0),end=new Uint8Array(22),ev=new DataView(end.buffer);ev.setUint32(0,0x06054b50,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);ev.setUint32(12,size,true);ev.setUint32(16,offset,true);return new Blob([...chunks,...central,end] as BlobPart[],{type:'application/zip'});}
 
-export async function createRegionMask(task:Task,variant:Variant,regions:import('./atmos-types').RegionNote[],fit:'cover'|'contain'='cover'){
+export async function createRegionMask(task:Task,variant:Variant,regions:import('./atmos-types').RegionNote[],fit:'cover'|'contain'='cover',productBounds?:SafeArea){
  const {regionToSource}=await import('./atmos-versions');
  const original=await image(variant.url),mask=document.createElement('canvas');mask.width=original.naturalWidth;mask.height=original.naturalHeight;
  if(mask.width*mask.height>20000000)throw new Error('原图超过 2000 万像素，请使用较小的背景图进行框选调整');
  const ctx=mask.getContext('2d')!;ctx.fillStyle='#fff';ctx.fillRect(0,0,mask.width,mask.height);
- const sourceRegions=regions.map(region=>{const r=regionToSource(region,task[variant.device],[mask.width,mask.height],[variant.focusX,variant.focusY],fit);if(!r.width||!r.height)throw new Error('框选没有覆盖背景，请重新框选');ctx.clearRect(r.x,r.y,r.width,r.height);return {...region,x:r.x/mask.width,y:r.y/mask.height,width:r.width/mask.width,height:r.height/mask.height};});
+ const sourceRegions=regions.map(region=>{const r=productBounds?productRegionToSource(region,task[variant.device],[mask.width,mask.height],productBounds):regionToSource(region,task[variant.device],[mask.width,mask.height],[variant.focusX,variant.focusY],fit);if(!r.width||!r.height)throw new Error('框选没有覆盖背景，请重新框选');ctx.clearRect(r.x,r.y,r.width,r.height);return {...region,x:r.x/mask.width,y:r.y/mask.height,width:r.width/mask.width,height:r.height/mask.height};});
  const blob=await canvasBlob(mask,'png');if(blob.size>=4*1024*1024)throw new Error('区域蒙版超过 4 MB，请缩小原图');
  return {dataUrl:mask.toDataURL('image/png'),regions:sourceRegions};
 }
 
 /** Opaque studio background, exact square output; contain avoids clipping an unexpected source ratio. */
-export async function drawProductCover(canvas:HTMLCanvasElement,url:string,size=1500,background=COVER_BACKGROUND){
+export async function drawProductCover(canvas:HTMLCanvasElement,url:string,size=1500,background=COVER_BACKGROUND,bounds?:SafeArea){
  const im=await image(url);canvas.width=size;canvas.height=size;
  const ctx=canvas.getContext('2d')!;ctx.fillStyle=background;ctx.fillRect(0,0,size,size);
  const k=Math.min(size/im.naturalWidth,size/im.naturalHeight);
  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
- ctx.drawImage(im,(size-im.naturalWidth*k)/2,(size-im.naturalHeight*k)/2,im.naturalWidth*k,im.naturalHeight*k);
+ if(bounds){const frame=productFrame(im.naturalWidth,im.naturalHeight,size,bounds);ctx.drawImage(im,frame.x,frame.y,frame.width,frame.height);}else ctx.drawImage(im,(size-im.naturalWidth*k)/2,(size-im.naturalHeight*k)/2,im.naturalWidth*k,im.naturalHeight*k);
  return {width:size,height:size,sourceWidth:im.naturalWidth,sourceHeight:im.naturalHeight};
 }

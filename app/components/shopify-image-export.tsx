@@ -12,13 +12,13 @@ type Preview=ShopifyExportMeta&{url:string;originalUrl:string};
 export function ShopifyImageExport({variant,name,disabled,onRun,onRecord}:Props){
  const [format,setFormat]=useState<ShopifyFormat>('webp'),[quality,setQuality]=useState(85),[preview,setPreview]=useState<Preview|null>(null),[preparing,setPreparing]=useState(false),[confirming,setConfirming]=useState(false),[ready,setReady]=useState(false),[error,setError]=useState(''),[zoom,setZoom]=useState('fit');
  const cache=useRef<{canvas:HTMLCanvasElement;blob:Blob;url:string}|null>(null),alive=useRef(true),left=useRef<HTMLDivElement>(null),right=useRef<HTMLDivElement>(null);
- const enabled=!!variant?.approved&&variant.stage==='high',current=!!preview&&preview.format===format&&preview.quality===quality;
+ const enabled=!!variant?.approved&&variant.stage==='high'&&!!variant.boundsConfirmed,current=!!preview&&preview.format===format&&preview.quality===quality;
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;if(cache.current)URL.revokeObjectURL(cache.current.url);};},[]);
  useEffect(()=>()=>{if(preview)URL.revokeObjectURL(preview.url);},[preview]);
  function settings(nextFormat:ShopifyFormat,nextQuality:number){setFormat(nextFormat);setQuality(nextQuality);setReady(false);setError('');}
  async function prepare(){await onRun('正在生成 Shopify 压缩预览',async()=>{setPreparing(true);setReady(false);setError('');try{
   if(!enabled||!variant)throw new Error('请先生成并确认高清版本');
-  let original=cache.current;if(!original){const canvas=document.createElement('canvas');await drawProductCover(canvas,variant.url,COVER_SIZE,coverVersionBackground(variant));const blob=await canvasBlob(canvas,'png');if(!alive.current)return;original={canvas,blob,url:URL.createObjectURL(blob)};cache.current=original;}
+  let original=cache.current;if(!original){const canvas=document.createElement('canvas');await drawProductCover(canvas,variant.url,COVER_SIZE,coverVersionBackground(variant),variant.subjectBounds);const blob=await canvasBlob(canvas,'png');if(!alive.current)return;original={canvas,blob,url:URL.createObjectURL(blob)};cache.current=original;}
   // Always encode from the original rendered canvas, never from an already compressed preview.
   const blob=await encodeShopifyImage(original.canvas,format,quality);if(!alive.current)return;
   setPreview({url:URL.createObjectURL(blob),originalUrl:original.url,originalBytes:original.blob.size,bytes:blob.size,format,quality});

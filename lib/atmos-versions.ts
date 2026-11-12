@@ -29,7 +29,7 @@ export function editCanvasVersion(task:Task,id:string,changes:Partial<Variant>):
  const current=task.variants.find(v=>v.id===id);if(!current)return task;
  // Coalesce an unconfirmed canvas draft so dragging a slider does not create hundreds of versions.
  const draft=current.label==='画布调整'&&!current.approved;
- const variant={...current,...changes,id:draft?current.id:uid(),parentId:draft?current.parentId:current.id,revision:draft?current.revision:nextRevision(task,current.device,current.group),created:draft?current.created:new Date().toISOString(),label:'画布调整',approved:false};
+ const variant={...current,...changes,qualityReview:undefined,id:draft?current.id:uid(),parentId:draft?current.parentId:current.id,revision:draft?current.revision:nextRevision(task,current.device,current.group),created:draft?current.created:new Date().toISOString(),label:'画布调整',approved:false};
  return recordImageVersion(task,variant);
 }
 export function selectedForExport(task:Task,group:number,devices:Device[]){
