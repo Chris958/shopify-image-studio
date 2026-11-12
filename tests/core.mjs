@@ -41,6 +41,12 @@ for(const status of [301,302,303,307,308]){
  assert.equal(calls.length,before+1,'redirects must not cause a second upstream request');
 }
 upstreamStatus=401;res=await server.namespace.apiFetch('https://api.openai.com/v1','/models','dummy-key');assert.equal(res.status,401);await assert.rejects(()=>server.namespace.checkedJson(res),/HTTP 401/);
+// Surface the real provider failure without exposing provider messages or retrying paid calls.
+for(const [status,code,category,text] of [[400,'get_channel_failed','channel','模型通道'],[500,'server_error','provider','服务商内部异常'],[401,'invalid_api_key','authorization','密钥'],[400,'invalid_request_error','parameter','size']]){
+ const response=Response.json({error:{code,param:category==='parameter'?'size':undefined,message:'sensitive-provider-message sk-do-not-display'}},{status,headers:{'x-request-id':'qa-request-id'}});
+ await assert.rejects(()=>server.namespace.checkedJson(response),e=>{assert.equal(e.upstream.category,category);assert.equal(e.upstream.status,status);assert.equal(e.upstream.requestId,'qa-request-id');assert.ok(e.message.includes(text));assert.ok(!e.message.includes('sensitive-provider-message'));assert.ok(!e.message.includes('sk-do-not-display'));return true;});
+}
+const generationTrace='5fb89133a02ee718c3448a77326bab97';await assert.rejects(()=>server.namespace.checkedJson(Response.json({error:{code:'server_error',message:'status_code=500, 没有按照预期生成图片，请重新调整提示词后重试（traceid: '+generationTrace+'）'}},{status:500})),e=>{assert.equal(e.upstream.category,'generation');assert.equal(e.upstream.requestId,generationTrace);assert.match(e.message,/模型未产出图片/);return true;});
 // Verify the actual streamed connection-test route for all supported interfaces.
 const ai=await moduleFor(path.resolve('app/api/ai/route.ts'));await ai.evaluate();
 for(const endpoint of ['images','responses','chat']){
@@ -189,6 +195,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(versions.namespace.regionToSource({x:
 const direction=await moduleFor(path.resolve('lib/art-direction.ts'));await direction.evaluate();
 const framing=await moduleFor(path.resolve('lib/product-framing.ts'));await framing.evaluate();
 let directed={...timeline,assets:[originalId],brief:'Original product-led creative brief',title:'EXACT ORIGINAL COPY',artDirection:undefined};
+const compactBrand=direction.namespace.brandConstraints({...directed.spec,source:'INTERNAL_EVIDENCE_METADATA',references:['INTERNAL_ASSET_UUID'],titleFont:'INTERNAL_FONT_UUID',rules:[{text:'KEEP LOCKED RULE',locked:true}]});assert.doesNotMatch(compactBrand,/INTERNAL_EVIDENCE_METADATA|INTERNAL_ASSET_UUID|INTERNAL_FONT_UUID/);assert.match(compactBrand,/KEEP LOCKED RULE/);
 const blueprint=direction.namespace.createArtDirection(directed);directed={...directed,artDirection:blueprint};
 assert.ok(direction.namespace.currentArtDirection(directed));assert.equal(direction.namespace.currentArtDirection({...directed,title:'Changed copy'}),false);assert.notDeepEqual(JSON.parse(JSON.stringify(blueprint.desktop)),JSON.parse(JSON.stringify(blueprint.mobile)));
 assert.throws(()=>direction.namespace.validateArtDirection({...blueprint,mobile:{...blueprint.mobile,textArea:{x:.9,y:0,width:.5,height:.4}}},directed),/安全区/);
@@ -211,6 +218,10 @@ await server.namespace.writeDoc({id:directedId,kind:'task',project:pid,data:{...
 upstreamFetch=async(url,options)=>{assert.match(options.body.get('prompt'),/CONFIRMED OLD ART DIRECTION/);assert.doesNotMatch(options.body.get('prompt'),/UNCONFIRMED NEW ART DIRECTION/);return Response.json({data:[{b64_json:Buffer.from(png).toString('base64')}]});};
 const directedHigh=await requestImage(changedDirection,{stage:'high',taskId:directedId,approvedVariantId:frozenVariant.id,variantUrl:frozenVariant.url});assert.equal(directedHigh.type,'result',directedHigh.error);assert.equal(directedHigh.result.artDirection.concept,'CONFIRMED OLD ART DIRECTION');
 const checkedTask={...directed,variants:[{...frozenVariant,qualityReview:reviewed.result}]};assert.equal(versions.namespace.editCanvasVersion(checkedTask,frozenVariant.id,{overlay:.2}).variants[0].qualityReview,undefined,'canvas edits must invalidate the previous review');
+
+// A failed real image transport keeps provider diagnostics in its streamed event and job record.
+let rejectedCalls=0;upstreamFetch=async()=>{rejectedCalls++;return Response.json({error:{code:'get_channel_failed',message:'private provider detail'}},{status:400,headers:{'x-request-id':'qa-channel-request'}});};
+const noChannel=await requestImage(directed);assert.equal(noChannel.type,'error');assert.match(noChannel.error,/服务商未找到可用模型通道/);assert.equal(noChannel.upstream.category,'channel');assert.equal(noChannel.upstream.requestId,'qa-channel-request');assert.equal(rejectedCalls,1,'never automatically retry a paid image request');const rejectedJob=await server.namespace.readDoc(noChannel.jobId,'qa-owner');assert.equal(rejectedJob.data.upstream.status,400);assert.doesNotMatch(rejectedJob.data.error,/private provider detail/);
 
 upstreamFetch=fetch;
 res=await data.namespace.PUT(new Request('https://atmos.example/api/data',{method:'PUT',headers:{Origin:'https://malicious.example','Content-Type':'application/json'},body:JSON.stringify({doc:{id:pid,kind:'project',project:pid,data:{name:'spoof'}}})}));assert.equal(res.status,400);

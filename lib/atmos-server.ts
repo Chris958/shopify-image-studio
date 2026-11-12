@@ -19,4 +19,21 @@ export async function apiFetch(base:string,path:string,key:string,body?:any){
  }
  return response;
 }
-export async function checkedJson(res:Response){let j:any;try{j=await res.json();}catch{throw new Error('服务未返回有效 JSON（HTTP '+res.status+'）');}if(!res.ok){const code=j?.error?.code||j?.error?.type||'';throw new Error('模型请求失败（HTTP '+res.status+(code?' / '+code:'')+'）。请检查配置、权限或参数。');}return j;}
+function safeDiagnostic(value:unknown){return typeof value==='string'&&/^[a-zA-Z0-9_.:/-]{1,180}$/.test(value)?value:undefined;}
+export class ModelAPIError extends Error{
+ constructor(message:string,readonly upstream:{status:number;code?:string;parameter?:string;requestId?:string;category:string}){super(message);this.name='ModelAPIError';}
+}
+export function modelFailure(res:Response,j:any){
+ const code=safeDiagnostic(j?.error?.code)||safeDiagnostic(j?.error?.type),parameter=safeDiagnostic(j?.error?.param),requestId=safeDiagnostic(res.headers.get('x-request-id'))||safeDiagnostic(res.headers.get('request-id'))||safeDiagnostic(j?.request_id)||safeDiagnostic(String(j?.error?.message||'').match(/traceid\s*[:=]\s*([a-zA-Z0-9-]{16,100})/i)?.[1]),status=res.status;
+ let category='request',reason='模型服务拒绝了请求，请核对服务商支持的接口、模型和请求参数。';
+ if(code==='get_channel_failed'||code==='no_available_channel'){category='channel';reason='服务商未找到可用模型通道。请核对模型 ID、API Key 所属分组及该分组的生图/编辑权限，或联系服务商开通通道。';}
+ else if(status===401||status===403){category='authorization';reason='模型服务拒绝了当前密钥或权限。请核对 API Key、所属分组及模型访问权限。';}
+ else if(status===429){category='capacity';reason='模型服务触发限流或额度限制。请核查服务商用量、余额和并发限制后再重试。';}
+ else if(status>=500&&/没有按照预期生成图片|未.{0,8}生成图片|no image|failed to generate/i.test(String(j?.error?.message||''))){category='generation';reason='上游模型未产出图片。可减少相互冲突的场景要求、使用更少的相关参考图后手动重试；若仍失败，请让服务商按请求 ID 核查。';}
+ else if(status>=500){category='provider';reason='模型服务商内部异常或上游通道故障。请联系服务商核查通道状态；系统不会自动重复提交生图请求。';}
+ else if(code==='model_not_found'){category='model';reason='当前服务商或密钥无法访问此模型 ID。请从该密钥可用的模型列表中确认准确名称。';}
+ else if(parameter){category='parameter';reason='模型服务拒绝了参数 '+parameter+'。请按此服务商的接口要求核对该参数。';}
+ const message=`模型请求失败（HTTP ${status}${code?' / '+code:''}）。${reason}${requestId?' 请求 ID：'+requestId:''}`;
+ return new ModelAPIError(message,{status,code,parameter,requestId,category});
+}
+export async function checkedJson(res:Response){let j:any;try{j=await res.json();}catch{throw new ModelAPIError('模型服务未返回有效 JSON（HTTP '+res.status+'），请检查 API 地址和服务商状态。',{status:res.status,category:'response'});}if(!res.ok)throw modelFailure(res,j);return j;}
